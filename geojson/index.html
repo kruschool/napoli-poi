@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Luoghi di cultura - Napoli (Leaflet + OSM)</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <style>
+    html,body { height:100%; margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; }
+    #map { height: 100vh; width: 100%; }
+    .popup-image { max-width:220px; height:auto; display:block; margin:6px 0; }
+    .info { padding:6px 8px; font-size:14px; }
+    .legend { background: white; padding:6px 8px; border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,0.3); }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    const map = L.map('map').setView([40.84, 14.246], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // funzione popup con immagine + link
+    function popupContent(props) {
+      const nome = props.nome || 'Senza nome';
+      const tipologia = props.tipologia ? `<small>${props.tipologia}</small><br>` : '';
+      const indirizzo = props.indirizzo ? `<div><em>${props.indirizzo}</em></div>` : '';
+      const quartiere = props.quartiere ? `<div>Quartiere: ${props.quartiere}</div>` : '';
+      const immagine = props.imageUrl ? `<img class="popup-image" src="${props.imageUrl}" alt="${nome}" onerror="this.style.display='none'">` : '';
+      const dettaglio = props.dettaglio ? `<div><a href="${props.dettaglio}" target="_blank">Scheda dettaglio</a></div>` : '';
+      return `<div class="info"><strong>${nome}</strong><br>${tipologia}${indirizzo}${quartiere}${immagine}${dettaglio}</div>`;
+    }
+
+    // Carica il GeoJSON esterno
+    fetch('luoghi_cultura_napoli.geojson')
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP error ' + res.status);
+        return res.json();
+      })
+      .then(data => {
+        console.log('GeoJSON caricato, feature count:', (data.features||[]).length);
+        const layer = L.geoJSON(data, {
+          pointToLayer: function(feature, latlng) {
+            return L.marker(latlng);
+          },
+          onEachFeature: function(feature, layer) {
+            const props = feature.properties || {};
+            layer.bindPopup(popupContent(props));
+          }
+        }).addTo(map);
+
+        // adatta la vista se ci sono bounds
+        try {
+          const bounds = layer.getBounds();
+          if (bounds.isValid()) map.fitBounds(bounds.pad(0.2));
+        } catch (e) {
+          console.warn('fitBounds non disponibile:', e);
+        }
+      })
+      .catch(err => {
+        console.error('Impossibile caricare il GeoJSON:', err);
+        alert('Errore nel caricamento del file GeoJSON. Controlla la console (F12) per dettagli.');
+      });
+
+    // legenda semplice
+    const info = L.control({position: 'topright'});
+    info.onAdd = function(map) {
+      const div = L.DomUtil.create('div', 'legend');
+      div.innerHTML = '<strong>Luoghi di cultura - Napoli</strong><br>Dataset: edicole (popup: immagine + link)';
+      return div;
+    };
+    info.addTo(map);
+  </script>
+</body>
+</html>
